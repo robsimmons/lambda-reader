@@ -1,0 +1,15 @@
+%pos int * int
+%name Test
+
+%term IDENT of string | LAMBDA | DOT | LPAREN | RPAREN | COMPOSE 
+
+%nonterm Exp of exp
+
+
+%start Program
+
+%nonassoc 
+nonterminal Exp: exp =
+  1:IDENT => ident
+  1:Exp COMPOSE 2:Exp => compose       precl 10
+  
