@@ -19,13 +19,13 @@ struct
 
       fun encode appFixity tokFixity = makeFun (makeMap appFixity tokFixity)
    in
-   (* Lisp is really simple *)
-   val lisp = 
-      encode 1
-        [ (["'"], Fix (Prefix, 1)),
-          (["("], Bracket ")") ]
 
-   (* Twelf without fixity declarations *)
+   (* Lisp is really simple. There's basically only one thing: quote. *)
+   val lisp =
+      encode 1
+        [ (["'"], Fix (Prefix, 1)) ]
+
+   (* Simple Twelf, without fixity declarations. *)
    val twelf = 
       encode 6
         [ (["["], Binder "]"),
@@ -33,10 +33,9 @@ struct
           (["="], Fix (None, 1)),
           ([":"], Fix (None, 2)),
           (["<-"], Fix (Left, 3)),
-          (["->"], Fix (Right, 4)),
-          (["("], Bracket ")") ]
+          (["->"], Fix (Right, 4)) ]
 
-   (* Celf *)
+   (* Celf, mostly. *)
    val celf = 
       encode 6
         [ (["EXISTS", "PI", "Exists", "Pi", "\\"], Binder "."),
@@ -46,7 +45,6 @@ struct
           (["-o", "-@", "->"], Fix (Right, 4)),
           (["*", "&"], Fix (Right, 5)),
           (["!", "@"], Fix (Prefix, 6)),
-          (["("], Bracket ")"),
           (["["], Bracket "]"),
           (["<"], Bracket ">"),
           (["{"], Bracket "}") ]
