@@ -1,0 +1,13 @@
+nat: type.
+z: nat. % Line comment
+s: nat -> nat. %%line comment
+four: nat = s (s ( s (s %{ Multiline comment }% z))). 
+
+plus: {N: nat} {M: nat} {P: nat} type.
+%mode plus +A +B -C.
+p/z: plus z N N.
+p/s: {M} plus (s M) N (s P) <- plus M N P.
+
+%.
+
+ill-formed
