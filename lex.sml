@@ -19,36 +19,71 @@ sig
                  -> Coord.coord
                  -> (char * Coord.coord) Stream.stream
                  -> (string * Pos.pos) Stream.stream
+
+   (* Initial state for the tokenizer *)
+   val initial: to_resume
 end
 
 signature LEXER = 
 sig
-   exception Multiline of int
-   val tokenize: (Coord.coord * (char * Coord.coord) Stream.stream)
+   type to_resume
+   exception Resumable of to_resume * Coord.coord
+   val tokenize: to_resume 
+                 -> Coord.coord
+                 -> (char * Coord.coord) Stream.stream
                  -> (string * Pos.pos) Stream.stream
+
+(*
    val tokenizeNamedString: string -> string -> (string * Pos.pos) Stream.stream
    val tokenizeString: string -> (string * Pos.pos) Stream.stream
+*)
    val tokenizeFile: string -> (string * Pos.pos) Stream.stream
-   val tokenizeStream: TextIO.instream -> (string * Pos.pos) Stream.stream
+(*
    val tokenizeStdIn: unit -> (string * Pos.pos) Stream.stream
    val tokenizeStreamLine: string -> TextIO.instream
                            -> (string * Pos.pos) Stream.stream
    val tokenizeStdInLine: string -> (string * Pos.pos) Stream.stream
+*)
 end
 
-functor MakeLexer (Lex: LEX_CORE) = 
+functor MakeLexer (Lex: LEX_CORE):> 
+   LEXER where type to_resume = Lex.to_resume = 
 struct
-   exception Multiline = Lex.Multiline
+   type to_resume = Lex.to_resume
+   exception Resumable = Lex.Resumable 
+
+   (* Hmm, factor this out? I think this belongs in a "fsutil" smackage
+      package. *)
+   fun iostream (finalize: unit -> unit) (stream: TextIO.instream) = 
+      Stream.lazy 
+      (fn () => 
+          case TextIO.input1 stream of
+             NONE => (finalize (); Stream.Nil)
+           | SOME c => Stream.Cons (c, iostream finalize stream))
+
+   (* Factor this out too? *)
+   fun eol stream = 
+      case Stream.front stream of
+         Stream.Cons (#"\n", _) => true
+       | Stream.Cons (#"\v", _) => true
+       | Stream.Cons (#"\f", _) => true
+       | Stream.Cons (#"\r", stream) => 
+           (case Stream.front stream of
+               Stream.Cons (#"\n", _) => false
+             | _ => true)
+       | _ => false
 
    val tokenize = Lex.tokenize
 
-   fun tokenizeNamedString name s = raise Match
-
-   fun tokenizeString s = tokenizeNamedString "string" s
-
-   fun tokenizeFile name s = raise Match
-   
-   fun tokenizeStdIn () = tokenizeNamedString "" (TextIO.inputLine TextIO.stdIn)
+   fun tokenizeFile (name: string) =
+   let
+      val coord = Coord.init name
+      val instream = TextIO.openIn name
+      val charstream = iostream (fn () => TextIO.closeIn instream) instream
+      val coordstream = CoordinatedStream.coordinate eol coord charstream
+   in
+      Lex.tokenize Lex.initial coord coordstream
+   end 
 end
 
 (* Dumbest possible reasonable lexer:
@@ -58,9 +93,11 @@ end
  * Tokens are separated by whitespace and reserved . *)
 structure LexSimple = 
 struct
-   exception Multiline of int * Coord.coord
+   type to_resume = unit
+   val initial = ()
+   exception Resumable of to_resume * Coord.coord
    
-   fun tokenize reserved n coord cs = 
+   fun tokenize reserved () coord cs = 
    let
       fun single (coord, cs) = 
          case Stream.front cs of
@@ -68,6 +105,7 @@ struct
           | Stream.Cons ((#"\n", coord'), cs) => (coord', cs)
           | Stream.Cons ((_, coord'), cs) => single (coord', cs)
 
+      (* Find the beginning of the next token *)
       fun next (coord, cs) () = 
          case Stream.front cs of
             Stream.Nil => Stream.Nil
@@ -83,7 +121,9 @@ struct
       and token start chars (coord, cs) = 
          case Stream.front cs of
             Stream.Nil => Stream.Nil
-          | Stream.Cons ((#"#", coord'), cs) => next (single (coord', cs)) ()
+          | Stream.Cons ((#"#", coord'), cs) => 
+               Stream.Cons ((implode (rev chars), Pos.pos start coord),
+                 Stream.lazy (next (single (coord', cs))))
           | Stream.Cons ((c, coord'), cs) => 
                if reserved c 
                then Stream.Cons ((implode (rev chars), Pos.pos start coord), 
@@ -93,24 +133,32 @@ struct
                else if Char.isSpace c
                then Stream.Cons ((implode (rev chars), Pos.pos start coord),
                       Stream.lazy (next (coord', cs)))
-               else token coord [c] (coord', cs)
+               else token coord (c :: chars) (coord', cs)
    in
-      if n > 0 
-      then raise Multiline (n, coord)
-      else Stream.lazy (next (coord, cs))
+      Stream.lazy (next (coord, cs))
    end
 end
 
-(* A lispy lexer *)
-structure LexCoreLisp:> LEX_CORE = 
-struct
-   open LexSimple
-   val tokenize = 
-      tokenize (fn #"(" => true | #")" => true | #"'" => true | _ => false)
-end
+(* A minimal lispy lexer *)
+structure LexParens = 
+MakeLexer
+  (struct
+      open LexSimple
+      val tokenize = 
+         tokenize (fn #"(" => true | #")" => true | #"'" => true | _ => false)
+   end)
 
-structure LexLisp =
-
+(* An slightly more involved lexer - ()[].'=, are separators *)
+structure LexBrackets = 
+MakeLexer
+  (struct
+      open LexSimple
+      val tokenize = 
+         tokenize (fn #"(" => true | #")" => true | #"'" => true 
+                    | #"[" => true | #"]" => true | #"." => true
+                    | #"{" => true | #"}" => true | #"=" => true
+                    | #"," => true | _ => false)
+   end)
 
 (* Twelf-like lexing:
  * 
@@ -125,7 +173,9 @@ structure LexLisp =
  * or whitespaces arises. *)
 structure LexPercent = 
 struct
-   exception Multiline of int * Coord.coord
+   type to_resume = int
+   val initial = 0
+   exception Resumable of to_resume * Coord.coord
 
    fun tokenize reserved n coord cs = 
    let
@@ -133,10 +183,10 @@ struct
       (* Returns the stream after reading n closing braces *)
       fun multi (coord, cs) n = 
          case Stream.front cs of
-            Stream.Nil => raise Multiline (n, coord)
+            Stream.Nil => raise Resumable (n, coord)
           | Stream.Cons ((#"}", coord'), cs) =>
               (case Stream.front cs of 
-                  Stream.Nil => raise Multiline (n, coord')
+                  Stream.Nil => raise Resumable (n, coord')
                 | Stream.Cons ((#"%", coord''), cs) => 
                      if n = 1 then (coord'', cs) else multi (coord', cs) (n-1) 
                 | _ => multi (coord', cs) n)
@@ -202,12 +252,14 @@ struct
    end
 end
 
-structure LexCoreTwelf:> LEX_CORE =
-struct
-   open LexPercent
-   val tokenize = 
-      tokenize (fn #"(" => true | #")" => true | #":" => true
-                 | #"[" => true | #"]" => true | #"." => true
-                 | #"{" => true | #"}" => true | #"\"" => true
-                 | _ => false)
-end
+(* A faithful Twelf lexer *)
+structure LexCoreTwelf =
+MakeLexer
+  (struct
+      open LexPercent
+      val tokenize = 
+         tokenize (fn #"(" => true | #")" => true | #":" => true
+                    | #"[" => true | #"]" => true | #"." => true
+                    | #"{" => true | #"}" => true | #"\"" => true
+                    | _ => false)
+   end)

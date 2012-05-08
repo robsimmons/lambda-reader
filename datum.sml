@@ -1,5 +1,5 @@
 (* Abstract representation of syntax trees, lightly-parsed strings. *)
-signature SYNTAX_TREE = 
+signature DATUM = 
 sig
    type 'tok syn
    type 'tok t = 'tok syn
@@ -14,7 +14,7 @@ sig
       @params (syns, coord)
       @param syns  List of syntax tress S1 S2 S3 ... Sn
       @param coord The file coordinates of the list of syntax trees *)
-   val List: 'tok syn list * Coord.coord -> 'tok syn     
+   val List: 'tok * 'tok syn list * Coord.coord -> 'tok syn     
 end
 
 (* Concrete representation of syntax. *)
@@ -22,7 +22,7 @@ structure SyntaxTree =
 struct
    datatype 'tok syn = 
       Atom of 'tok * Coord.coord
-    | List of 'tok syn list * Coord.coord
+    | List of 'tok * 'tok syn list * Coord.coord
    type 'tok t = 'tok syn
 end
 
