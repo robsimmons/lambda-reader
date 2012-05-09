@@ -1,40 +1,100 @@
 
 structure Struct = 
 struct
+   (* After you see a token, what do you expect? *)
    datatype 'a token_cont = 
-      DONE
+      (* You expect to parse some datums, and then reach one of these tokens,
+         at which point you continue working on this datum. *)
+      TOK of ('a * 'a token_cont) list
+      
+      (* The datum continues until either one of these characters is reached,
+         or the hard-stop is reached. *)
+    | LONGEST of ('a * 'a token_cont) list
+
+      (* The datum is fully parsed. *)
+    | DONE
+
+      (* Parse exactly one more character and add it to the datum. *)
     | SHORTEST
-    | LONGEST of ('a * 'a token_cont) list 
-    | ONLY of ('a * 'a token_cont) list
 
-    ("if",
-     [("then", 
-       [("else", LONGEST),
-        LONGEST])]
+   fun series_longest [] = raise Fail "Invariant (series_longest)"
+     | series_longest [x] = (x, LONGEST [])
+     | series_longest (x :: xs) = (x, TOK [ series_longest xs ]) 
 
-  val iflang = 
-     [ ("if", 
-        ONLY)
-       ("(", 
-        ONLY [(")", DONE)] 
-       ("[",
-        ONLY 
-         [ (":", 
-            ONLY 
-             [ ("]", LONGEST) ]),
-           ("]", LONGEST) ]
-     CONT 
-      { tok = "if",
-        success =
-        CONT
-         { tok = "then",
-           success =
-           CONT 
-            { tok = "else",
-              success = LONGEST
-              failure = 
-           CONT
-      failure=?
+   fun series [] = raise Fail "Invariant (series)"
+     | series [x] = (x, DONE)
+     | series (x :: xs) = (x, TOK [ series xs ])
+
+
+   (* Simple if language *)
+   val iflang = 
+      [ series_longest [ "if", "then", "else" ],
+        series [ "(", ")" ] ]
+
+
+   (* Little Ocaml *)
+   val mllang =
+      [ series ["(", ")"],
+        series ["{", "}"],
+        series_longest [ "match", "with" ],
+        series_longest [ "fn" ],
+        ("if", TOK [ ("then", LONGEST [ ("else", LONGEST []) ]) ]) ]
+
+
+   (* Celf *)
+   val optional_annotation_binding = 
+      TOK [ (".", LONGEST []),
+            (":", TOK [ (".", LONGEST []) ]) ]
+
+   val celf = 
+      [ series ["(", ")"],
+        series ["{", "}"],
+        series ["<", ">"],
+        series ["[", "]"],
+
+        ("Pi", optional_annotation_binding),
+        series_longest [ "PI", ":", "." ],
+        ("Exists", optional_annotation_binding),
+        series_longest [ "EXISTS", ":", "." ],
+ 
+        series_longest ["let", "{", "}", "="],
+        ("\\", optional_annotation_binding) ]
+
+
+   (* Twelf *)
+   val optional_intermediate_colon = 
+      fn close => TOK [ (close, DONE), (":", TOK [ (close, LONGEST []) ]) ]
+
+   val twelf = 
+      [ series [ "(", ")" ],
+        ("[", optional_intermediate_colon "]"),
+        ("{", optional_intermediate_colon "}") ]
+
+
+   (* Scheme r6rs *)
+   val optional_intermediate_dot = 
+      fn close => TOK [ (close, DONE), (".", TOK [ (close, DONE) ]) ]
+
+   val scheme = 
+      [ (* List *)
+        ("(", optional_intermediate_dot ")"),
+        ("[", optional_intermediate_dot "]"),
+
+        (* Abbrev prefix *)
+        ("'", SHORTEST),
+        ("`", SHORTEST),
+        (",", SHORTEST),
+        (",@", SHORTEST),
+        ("#'", SHORTEST),
+        ("#`", SHORTEST),
+        ("#,", SHORTEST),
+        ("#,@", SHORTEST),
+
+        (* Vector *)
+        series [ "#(", ")" ],
+
+        (* Bytevector *)
+        series [ "#vu8(", ")" ] ]
 end
 
 (*

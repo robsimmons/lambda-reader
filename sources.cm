@@ -6,3 +6,6 @@ Group is
 lex.sml
 lex-simple.sml
 lex-twelf.sml
+
+(* Generic parser *)
+parse.sml
