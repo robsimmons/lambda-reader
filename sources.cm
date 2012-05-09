@@ -8,4 +8,4 @@ lex-simple.sml
 lex-twelf.sml
 
 (* Generic parser *)
-parse.sml
+schema.sml

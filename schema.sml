@@ -1,6 +1,7 @@
+(* A schema explans how to parse a language into a dumb syntax tree. *)
 
-structure Struct = 
-struct
+signature SCHEMA = 
+sig
    (* After you see a token, what do you expect? *)
    datatype 'a token_cont = 
       (* You expect to parse some datums, and then reach one of these tokens,
@@ -16,6 +17,28 @@ struct
 
       (* Parse exactly one more character and add it to the datum. *)
     | SHORTEST
+
+   type 'a t = ('a * 'a token_cont) list
+   type 'a schema = ('a * 'a token_cont) list
+
+   val iflang: string schema
+   val mllang: string schema
+   val celf: string schema
+   val twelf: string schema
+   val scheme: string schema
+end
+
+structure Schema:> SCHEMA = 
+struct
+   (* After you see a token, what do you expect? *)
+   datatype 'a token_cont = 
+      TOK of ('a * 'a token_cont) list
+    | LONGEST of ('a * 'a token_cont) list
+    | DONE
+    | SHORTEST
+
+   type 'a t = ('a * 'a token_cont) list
+   type 'a schema = ('a * 'a token_cont) list
 
    fun series_longest [] = raise Fail "Invariant (series_longest)"
      | series_longest [x] = (x, LONGEST [])
@@ -76,7 +99,10 @@ struct
       fn close => TOK [ (close, DONE), (".", TOK [ (close, DONE) ]) ]
 
    val scheme = 
-      [ (* List *)
+      [ (* Actually a comment. *)
+        ("#;", SHORTEST),
+        
+        (* List *)
         ("(", optional_intermediate_dot ")"),
         ("[", optional_intermediate_dot "]"),
 
