@@ -36,7 +36,7 @@ struct
    type 'tok piece = 'tok * 'tok datum list * Pos.t
 end
 
-structure Parse = 
+functor ParseDatum (structure Datum: DATUM_POS) = 
 struct
 
    val unshiftable = ["."]
@@ -62,32 +62,10 @@ struct
 
    infix 2 $
 
-(*
-   datatype 'a item = 
-      TOK of 'a Datum.piece list * 'a Schema.t * 'a * Coord.t
-    | LONGEST of 'a Datum.piece list * 'a Schema.t * 'a * Coord.t
-    | DATUM of string Datum.t * Coord.t
-*)
-
    fun toList Bot ys = ys
      | toList (xs $ x) ys = toList xs (x :: ys)
 
    val toList = fn stack => toList stack []
-
-(*
-   fun new_token S (S $ TOK (pieces, schema, coord0), datums, position, (c, pos)) = 
-     (* Is this the next symbol in a token? *)
-     (case lookup schema c of
-         SOME con =>
-            continue S 
-       | 
-
-   fun schema S = 
-      case S of 
-         _ $ TOK ((c, con), coord) => schema
-       | _ $ LONGEST ((c, con), pos) => schema
-       | _ => []
-*)
 
    (* End of input reached without finishing multipart syntax begun at coord;
     * provides series of tokens that were expected next. *)
@@ -106,7 +84,7 @@ struct
                str 
        | NONE =>
             (* Oh, this is simple! *) 
-            (Datum.Atom (tok, pos), pos, Stream.front str))
+            (Datum.atom (tok, pos), pos, Stream.front str))
 
    (* Dispatch:
     * cont - The Schema.tok_cont we're dispatching upon
@@ -122,7 +100,7 @@ struct
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case cont of 
          Schema.DONE => 
-            (Datum.List (toList pieces), 
+            (Datum.list (toList pieces), 
              Pos.pos coord0 (Pos.right pos),
              Stream.front str)
        | Schema.MUST_SEE schema =>
@@ -169,7 +147,7 @@ struct
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case str of 
          Stream.Nil => (* Done! (by default) *)
-            (Datum.List (toList (pieces $ (tok, toList datums, pos))),
+            (Datum.list (toList (pieces $ (tok, toList datums, pos))),
              Pos.pos coord0 (Pos.right pos),
              str)
        | Stream.Cons (front as ((newtok, newpos), newstr)) => 
@@ -184,7 +162,7 @@ struct
                  (if member unshiftable newtok 
                      orelse member local_unshifts newtok
                   then (* Also done! (by default, token that we won't shift) *)
-                     (Datum.List (toList (pieces $ (tok, toList datums, pos))),
+                     (Datum.list (toList (pieces $ (tok, toList datums, pos))),
                       Pos.pos coord0 (Pos.right pos),
                       str)
                   else (* Add another datum to this piece *)
@@ -211,7 +189,7 @@ struct
                    parse_one front local_unshifts (* PRESERVE LOCAL UPSHIFTS *)
                val pieces' = pieces $ (tok, [datum], Pos.union pos pos')
             in 
-               (Datum.List (toList pieces),
+               (Datum.list (toList pieces),
                 Pos.pos coord0 (Pos.right pos'),
                 str')
             end)

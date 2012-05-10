@@ -8,5 +8,6 @@ lex-simple.sml
 lex-twelf.sml
 
 (* Generic parser *)
+datum.sml
 schema.sml
 parse.sml
