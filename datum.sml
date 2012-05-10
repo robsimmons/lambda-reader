@@ -1,4 +1,5 @@
 (* Abstract representation of syntax trees, lightly-parsed strings. *)
+
 signature DATUM = 
 sig 
    (* Representation of trailing whitespace (to reconstruct concrete syntax) *)
@@ -16,34 +17,80 @@ sig
    val list: ('tok * whitespace * 'tok datum list * pos) list -> 'tok datum
 end
 
-signature DATUM_SIMPLE = DATUM where type whitespace = unit and type pos = unit
-signature DATUM_POS = DATUM where type whitespace = unit and type pos = Pos.t
 
-structure SimpleDatum =
+(* Simple syntactic datums *)
+
+structure SimpleDatum = 
 struct
-   type whitespace = unit
-   type pos = unit
-   datatype 'tok datum = Atom of 'tok | List of ('tok * 'tok datum list) list
-   fun atom (tok, _, _) = Atom tok
-   fun list pieces = 
-      List (map (fn (tok, _, datums, _) => (tok, datums)) pieces)
+   datatype 'tok datum = 
+      Atom of 'tok 
+    | List of ('tok * 'tok datum list) list
+   type 'tok t = 'tok datum
 end
-structure Test:> DATUM_SIMPLE = SimpleDatum
-structure Test:> DATUM_POS = SimpleDatum
+
+functor SimpleDatumFn (type whitespace type pos):> 
+   DATUM where type 'tok datum = 'tok SimpleDatum.datum
+         and type whitespace = whitespace 
+         and type pos = pos =
+struct
+   type whitespace = whitespace
+   type pos = pos
+   type 'tok datum = 'tok SimpleDatum.datum
+   type 'tok t = 'tok datum
+   fun atom (tok, _, _) = SimpleDatum.Atom tok
+   fun list pieces = 
+      SimpleDatum.List (map (fn (tok, _, datums, _) => (tok, datums)) pieces)
+end
+
+
+(* Syntactic datums carrying positional information *)
 
 structure PosDatum = 
 struct
-   type whitespace = unit
+   datatype 'tok datum = 
+      Atom of 'tok * Pos.t
+    | List of ('tok * 'tok datum list * Pos.t) list
+   type 'tok t = 'tok datum
+end
+
+functor PosDatumFn (type whitespace):> 
+   DATUM where type 'tok datum = 'tok PosDatum.datum
+         and type whitespace = whitespace 
+         and type pos = Pos.t = 
+struct
+   type whitespace = whitespace
+   type pos = Pos.t
+   type 'tok datum = 'tok PosDatum.datum
+   type 'tok t = 'tok datum
+   fun atom (tok, _, pos) = PosDatum.Atom (tok, pos)
+   fun list pieces = 
+      PosDatum.List
+         (map (fn (tok, _, datums, pos) => (tok, datums, pos)) pieces)
+end
+
+
+
+(*
+structure Test:> DATUM_SIMPLE = 
+SimpleDatumFn (type whitespace = unit type pos = unit)
+structure Test:> DATUM_POS = DatumPos
+
+structure PosDatumFn (type whitespace) = 
+struct
+   type whitespace = whitespace
    type pos = Pos.t
    datatype 'tok datum = 
       Atom of 'tok * Pos.t
     | List of ('tok * 'tok datum list) list
+   type 'tok t = 'tok datum
    fun atom (tok, _, pos) = Atom (tok, pos)
    fun list pieces = 
       List (map (fn (tok, _, datums, pos) => (tok, datums, pos)) pieces)
 end
+structure PosDatum = 
 structure Test:> DATUM_POS = PosDatum
 
+*)
    (* EXAMPLES:
     * 
     * 'A

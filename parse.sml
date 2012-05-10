@@ -36,7 +36,8 @@ struct
    type 'tok piece = 'tok * 'tok datum list * Pos.t
 end
 
-functor ParseDatum (structure Datum: DATUM_POS) = 
+functor ParseDatum (structure Datum: DATUM where type whitespace = unit 
+                                             and type pos = Pos.t) = 
 struct
 
    val unshiftable = ["."]
@@ -84,7 +85,7 @@ struct
                str 
        | NONE =>
             (* Oh, this is simple! *) 
-            (Datum.atom (tok, pos), pos, Stream.front str))
+            (Datum.atom (tok, (), pos), pos, Stream.front str))
 
    (* Dispatch:
     * cont - The Schema.tok_cont we're dispatching upon
@@ -125,7 +126,7 @@ struct
            (case lookup schema newtok of 
                SOME token_cont => (* Next piece of multipart will now begin! *)
                   parse_cont token_cont coord0
-                     (pieces $ (tok, toList datums, pos)) 
+                     (pieces $ (tok, (), toList datums, pos)) 
                      (newtok, newpos)
                      local_unshifts
                      newstr
@@ -147,14 +148,14 @@ struct
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case str of 
          Stream.Nil => (* Done! (by default) *)
-            (Datum.list (toList (pieces $ (tok, toList datums, pos))),
+            (Datum.list (toList (pieces $ (tok, (), toList datums, pos))),
              Pos.pos coord0 (Pos.right pos),
              str)
        | Stream.Cons (front as ((newtok, newpos), newstr)) => 
            (case lookup schema newtok of 
                SOME token_cont => (* Next piece of multipart will now begin! *)
                   parse_cont token_cont coord0
-                     (pieces $ (tok, toList datums, pos)) 
+                     (pieces $ (tok, (), toList datums, pos)) 
                      (newtok, newpos)
                      local_unshifts
                      newstr
@@ -162,7 +163,8 @@ struct
                  (if member unshiftable newtok 
                      orelse member local_unshifts newtok
                   then (* Also done! (by default, token that we won't shift) *)
-                     (Datum.list (toList (pieces $ (tok, toList datums, pos))),
+                     (Datum.list 
+                         (toList (pieces $ (tok, (), toList datums, pos))),
                       Pos.pos coord0 (Pos.right pos),
                       str)
                   else (* Add another datum to this piece *)
@@ -187,7 +189,7 @@ struct
             else (* Find the datum; return the datum *)
             let val (datum, pos', str') = 
                    parse_one front local_unshifts (* PRESERVE LOCAL UPSHIFTS *)
-               val pieces' = pieces $ (tok, [datum], Pos.union pos pos')
+               val pieces' = pieces $ (tok, (), [datum], Pos.union pos pos')
             in 
                (Datum.list (toList pieces),
                 Pos.pos coord0 (Pos.right pos'),
