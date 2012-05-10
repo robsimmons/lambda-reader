@@ -15,3 +15,5 @@ schema.sml
 parse.sml
 
 examples.sml
+
+fixity.sml

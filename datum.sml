@@ -19,6 +19,7 @@ sig
 
    (* Constructing datums *)
    val atom: 'tok * whitespace * pos -> 'tok datum
+   (* Properly a conslist - the list must be nonempty *)
    val list: ('tok * whitespace * 'tok datum list * pos) list -> 'tok datum
 end
 
@@ -29,7 +30,7 @@ structure SimpleDatum =
 struct
    datatype 'tok datum = 
       Atom of 'tok 
-    | List of ('tok * 'tok datum list) list
+    | List of ('tok * 'tok datum list) list 
    type 'tok t = 'tok datum
 end
 
@@ -56,6 +57,20 @@ struct
       Atom of 'tok * Pos.t
     | List of ('tok * 'tok datum list * Pos.t) list
    type 'tok t = 'tok datum
+   fun pos datum = 
+      case datum of 
+         Atom (_, pos) => pos
+       | List [] => raise Domain
+       | List ((_, _, pos) :: parts) => 
+         let fun loop pos' [] = Pos.union pos pos' 
+               | loop _ ((_, _, pos') :: parts) = loop pos' parts
+         in loop pos parts end 
+   fun poss [] = raise Domain
+     | poss (datum :: datums) =
+       let val pos0 = pos datum 
+          fun loop pos' [] = Pos.union pos0 pos' 
+            | loop _ (datum :: datums) = loop (pos datum) datums
+       in loop pos0 datums end 
 end
 
 functor PosDatumFn (type whitespace):> 
