@@ -1,3 +1,6 @@
+(* Magic-character enabled lexing: LexCorTwelf *)
+(* Rob Simmons *)
+
 (* Twelf-like lexing:
  * 
  * `%' is special:

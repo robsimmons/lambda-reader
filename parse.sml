@@ -1,3 +1,25 @@
+(* Parsing *)
+
+signature PARSE_DATUM =
+sig
+   type tok
+   type 'tok datum
+
+   val parseOne: 
+      (tok Schema.t * tok list)
+      -> (tok * Pos.pos) Stream.front 
+      -> tok datum * (tok * Pos.pos) Stream.front
+
+   val parseMany:
+      (tok Schema.t * tok list)
+      -> (tok * Pos.pos) Stream.front
+      -> tok datum list * (tok * Pos.pos) Stream.front
+
+   val parseStream:
+      (tok Schema.t * tok list)
+      -> (tok * Pos.pos) Stream.front
+      -> tok datum Stream.stream
+end
 
 functor ParseDatum (structure Datum: DATUM where type whitespace = unit 
                                              and type pos = Pos.t

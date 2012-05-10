@@ -1,4 +1,5 @@
 (* Lexing character streams into token streams. *)
+(* Rob Simmons *)
 
 (* To write a lexer, implement the LEX_CORE signature and pass the resulting
  * structor to the MakeLexer functor; it the result implements LEXER. 

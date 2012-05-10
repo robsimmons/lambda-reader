@@ -2,13 +2,15 @@ Group is
 
 ../cmlib/cmlib.cm
 
+(* Representations of syntax *)
+datum.sml
+
 (* Lexer, and example implementations *)
 lex.sml
 lex-simple.sml
 lex-twelf.sml
 
 (* Generic parser *)
-datum.sml
 schema.sml
 parse.sml
 

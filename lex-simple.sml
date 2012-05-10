@@ -1,3 +1,6 @@
+(* Simple lex examples: LexParens and LexBrackets *)
+(* Rob Simmons *)
+
 (* Dumbest possible reasonable lexer:
  * `#...\n` is a single-line comment
  * Reserved characters (`reserved c` returns `true`) are parsed as single 

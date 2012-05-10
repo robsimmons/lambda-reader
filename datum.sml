@@ -1,4 +1,9 @@
 (* Abstract representation of syntax trees, lightly-parsed strings. *)
+(* Rob Simmons *)
+
+(* DATUM is the signature that a parser should expect as an argument 
+ * SimpleDatum and PosDatum are datatype representations of datums
+ * SimpleDatumFn and PosDatumFn adapt their representations to DATUM *)
 
 signature DATUM = 
 sig 
