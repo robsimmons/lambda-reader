@@ -98,7 +98,14 @@ struct
                      (":", MUST_SEE [ (close, MAY_SEE []) ]) ]
 
    val twelf = 
-      [ series [ "(", ")" ],
+      [ series [ "->" ],
+        series [ "<-" ],
+        series [ "_" ],
+        series [ "=" ],
+        series [ ":" ],
+        series [ "type" ],
+         
+        series [ "(", ")" ],
         ("[", optional_intermediate_colon "]"),
         ("{", optional_intermediate_colon "}") ]
 

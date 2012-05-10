@@ -58,7 +58,7 @@ struct
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case cont of 
          Schema.DONE => 
-            (Datum.list (toList pieces), 
+            (Datum.list (toList (pieces $ (tok, (), [], pos))), 
              Pos.pos coord0 (Pos.right pos),
              Stream.front str)
        | Schema.MUST_SEE schema =>
@@ -148,7 +148,7 @@ struct
                    parse_one front local_unshifts (* PRESERVE LOCAL UPSHIFTS *)
                val pieces' = pieces $ (tok, (), [datum], Pos.union pos pos')
             in 
-               (Datum.list (toList pieces),
+               (Datum.list (toList pieces'),
                 Pos.pos coord0 (Pos.right pos'),
                 str')
             end)

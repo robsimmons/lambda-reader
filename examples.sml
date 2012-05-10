@@ -33,16 +33,55 @@ struct
       val unshiftable = []
       val global_schema = Schema.celf)
 
-   val _ = ("'A", 
+   fun run lex parse_one (string, datum: string datum) =
+   let
+      val stream = lex string
+      val front = case Stream.front stream of 
+                     Stream.Nil => raise Fail "Empty string"
+                   | Stream.Cons front => front
+      val (datum', _, stream') = parse_one front []
+   in 
+      (datum', stream')
+   end
+
+   fun check lex parse_one (string, datum: string datum) = 
+   let
+      val (datum', stream') = run lex parse_one (string, datum)
+      
+   in 
+      if datum <> datum' 
+      then raise Fail "Datums that were supposed to match failed to match"
+      else case stream' of 
+              Stream.Nil => () 
+            | Stream.Cons _ => raise Fail "Incomplete lex" 
+   end
+
+   val a = check LexBrackets.tokenizeString SchemeParse.parse_one
+           ("'A", 
             List [ ("'", [A]) ])
-   val _ = ("[A B C D]",
+
+   val b = check LexBrackets.tokenizeString SchemeParse.parse_one
+           ("[A B C D]",
             List [ ("[",[A,B,C,D]), ("]",[]) ])
-   val _ = ("(A B . C D)",
+
+   val c = check LexBrackets.tokenizeString SchemeParse.parse_one
+           ("(A B . C D)",
             List [ ("(",[A,B]), (".",[C,D]), (")",[]) ])
-   val _ = ("if A B C then D E F else if G H then I J", 
+
+   val d = check LexBrackets.tokenizeString MLParse.parse_one
+           ("if A B then C D else E F G H I J",
+            List [ ("if",[A,B]),
+                   ("then",[C,D]),
+                   ("else",[E,F,G,H,I,J]) ])
+
+   val e = check LexBrackets.tokenizeString MLParse.parse_one 
+           ("if A B C then D E F else if G H then I J", 
             List [ ("if",[A,B,C]), 
                    ("then",[D,E,F]), 
                    ("else",[List [ ("if",[G,H]), ("then",[I,J]) ]]) ])
-   val _ = ("EXISTS A B : C . D E",
+
+   val f = check LexBrackets.tokenizeString CelfParse.parse_one
+           ("EXISTS A B : C . D E",
             List [ ("EXISTS",[A,B]), (":",[C]), (".",[D,E]) ])
 end
+

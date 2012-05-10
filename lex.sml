@@ -36,10 +36,8 @@ sig
                  -> (char * Coord.coord) Stream.stream
                  -> (string * Pos.pos) Stream.stream
 
-(*
    val tokenizeNamedString: string -> string -> (string * Pos.pos) Stream.stream
    val tokenizeString: string -> (string * Pos.pos) Stream.stream
-*)
    val tokenizeFile: string -> (string * Pos.pos) Stream.stream
 (*
    val tokenizeStdIn: unit -> (string * Pos.pos) Stream.stream
@@ -78,14 +76,25 @@ struct
 
    val tokenize = Lex.tokenize
 
+   fun tokenizeCoordStream (coord: Coord.t) (str: char Stream.stream) = 
+      Lex.tokenize Lex.initial coord 
+         (CoordinatedStream.coordinate eol coord str)
+
+   fun tokenizeCoordString (coord: Coord.t) (str: string) = 
+      tokenizeCoordStream coord (Stream.fromString str)
+
    fun tokenizeFile (name: string) =
    let
       val coord = Coord.init name
       val instream = TextIO.openIn name
       val charstream = iostream (fn () => TextIO.closeIn instream) instream
-      val coordstream = CoordinatedStream.coordinate eol coord charstream
    in
-      Lex.tokenize Lex.initial coord coordstream
+      tokenizeCoordStream coord charstream
    end 
+
+   fun tokenizeNamedString (name: string) (str: string) = 
+      tokenizeCoordString (Coord.init name) str
+
+   fun tokenizeString (str: string) = tokenizeNamedString "<string>" str
 end
 

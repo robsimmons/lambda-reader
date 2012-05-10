@@ -33,7 +33,9 @@ struct
 
       and token start chars (coord, cs) = 
          case Stream.front cs of
-            Stream.Nil => Stream.Nil
+            Stream.Nil => 
+               Stream.Cons ((implode (rev chars), Pos.pos start coord),
+                 Stream.eager Stream.Nil)
           | Stream.Cons ((#"#", coord'), cs) => 
                Stream.Cons ((implode (rev chars), Pos.pos start coord),
                  Stream.lazy (next (single (coord', cs))))
