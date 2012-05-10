@@ -126,9 +126,11 @@ struct
              Pos.pos coord0 (Pos.right pos),
              Stream.front str)
        | Schema.MUST_SEE schema =>
-            parse_must coord0 pieces (tok, pos, Bot) schema local_unshifts 
+            parse_must coord0 pieces (tok, Bot, pos) schema local_unshifts 
                (Stream.front str)
-       | Schema.MAY_SEE _ => raise Match
+       | Schema.MAY_SEE schema => 
+            parse_may coord0 pieces (tok, Bot, pos) schema local_unshifts
+               (Stream.front str)
        | Schema.EXACTLY_ONE => 
             parse_exactly_one coord0 pieces (tok, pos) local_unshifts  
                (Stream.front str))
@@ -137,7 +139,7 @@ struct
     * The local_unshifts are temporarily irrelevant in the handling of 
     * MUST_SEE continuations; they will only become relevant if a later token
     * in the same multipart datum has an EXACTLY_ONE or MAY_SEE continuation. *)
-   and parse_must coord0 pieces (tok, pos, datums) schema local_unshifts str
+   and parse_must coord0 pieces (tok, datums, pos) schema local_unshifts str
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case str of 
          Stream.Nil => raise EndOfInput (coord0, str, schema)
@@ -156,14 +158,14 @@ struct
                   let val (datum, pos', str') = 
                         parse_one front (map #1 schema) (* NEW LOCAL UNSHIFTS *)
                   in parse_must coord0 pieces 
-                        (tok, Pos.union pos pos', datums $ datum)
+                        (tok, datums $ datum, Pos.union pos pos')
                         schema 
                         local_unshifts
                         str'
                   end)))
 
    (* Handles MAY_SEE continuations. *)
-   and parse_may coord0 pieces (tok, pos, datums) schema local_unshifts str
+   and parse_may coord0 pieces (tok, datums, pos) schema local_unshifts str
    : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
      (case str of 
          Stream.Nil => (* Done! (by default) *)
@@ -190,7 +192,7 @@ struct
                      val local_unshifts = local_unshifts @ (map #1 schema)
                      val (datum, pos', str') = parse_one front local_unshifts
                   in parse_may coord0 pieces
-                        (tok, Pos.union pos pos', datums $ datum)
+                        (tok, datums $ datum, Pos.union pos pos')
                         schema 
                         local_unshifts
                         str'
