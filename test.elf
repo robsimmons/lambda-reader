@@ -1,0 +1,6 @@
+nat: type.
+
+% x: {(y: nat)} type.
+
+x: {_: nat} type.
+y: {_: nat} type = [n] x n.
