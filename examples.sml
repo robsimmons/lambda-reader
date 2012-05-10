@@ -1,52 +1,30 @@
+
+
 structure Examples = 
 struct
-   structure Dict = StringRedBlackDict
+   open SimpleDatum
 
-   local
-      open IntFixity (* Left/Right/None/Prefix/Postfix/Fix/Bindr/Bracket *)
+   val A = Atom "A"
+   val B = Atom "B"
+   val C = Atom "C"
+   val D = Atom "D"
+   val E = Atom "E"
+   val F = Atom "F"
+   val G = Atom "G"
+   val H = Atom "H"
+   val I = Atom "I"
+   val J = Atom "J"
 
-      fun makeMap appFixity tokFixity = 
-         (appFixity, 
-          List.foldr 
-             (fn ((toks, tchar), dict) =>
-                 List.foldr (fn (tok, dict) => Dict.insert dict tok tchar) 
-                    dict toks)
-             Dict.empty tokFixity)
+   structure SchemeParse = 
+   ParseDatum 
+     (structure Datum = SimpleDatumFn (type whitespace = unit type pos = Pos.t)
+      val unshiftable = []
+      val global_schema = Schema.scheme)
 
-      fun makeFun (appFixity, tokFixity) =
-         fn NONE => SOME (Fix (Right, appFixity))
-          | SOME tok => Dict.find tokFixity tok
+   structure CelfParse = 
+   ParseDatum 
+     (structure Datum = SimpleDatumFn (type whitespace = unit type pos = Pos.t)
+      val unshiftable = []
+      val global_schema = Schema.celf)
 
-      fun encode appFixity tokFixity = makeFun (makeMap appFixity tokFixity)
-   in
-
-   (* Lisp is really simple. There's basically only one thing: quote. *)
-   val lisp =
-      encode 1
-        [ (["'"], Fix (Prefix, 1)) ]
-
-   (* Simple Twelf, without fixity declarations. *)
-   val twelf = 
-      encode 6
-        [ (["["], Binder "]"),
-          (["{"], Binder "}"),
-          (["="], Fix (None, 1)),
-          ([":"], Fix (None, 2)),
-          (["<-"], Fix (Left, 3)),
-          (["->"], Fix (Right, 4)) ]
-
-   (* Celf, mostly. *)
-   val celf = 
-      encode 6
-        [ (["EXISTS", "PI", "Exists", "Pi", "\\"], Binder "."),
-          (["="], Fix (None, 1)),
-          ([":"], Fix (None, 2)),
-          (["o-", "@-", "<-"], Fix (Left, 3)),
-          (["-o", "-@", "->"], Fix (Right, 4)),
-          (["*", "&"], Fix (Right, 5)),
-          (["!", "@"], Fix (Prefix, 6)),
-          (["["], Bracket "]"),
-          (["<"], Bracket ">"),
-          (["{"], Bracket "}") ]
-   end
 end

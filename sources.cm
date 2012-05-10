@@ -11,3 +11,5 @@ lex-twelf.sml
 datum.sml
 schema.sml
 parse.sml
+
+examples.sml

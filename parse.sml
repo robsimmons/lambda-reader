@@ -1,47 +1,10 @@
 
-structure Datum = 
-struct
-   (* EXAMPLES:
-    * 
-    * 'A
-    * -->
-    * List [ ("'",[A]) ]
-    * 
-    * [A B C D]
-    * -->
-    * List [ ("[",[A,B,C,D]), ("]",[]) ]
-    * 
-    * (A B . C D)
-    * -->
-    * List [ ("(",[A,B]), (".",[C,D]), (")",[]) ]
-    *
-    * begin A middle B C late D end
-    * -->
-    * List [ ("begin",[A]), ("middle",[B,C]), ("late",[D]), ("end",[]) ]
-    *
-    * if A B C then D E F else G H I J
-    * -->
-    * List [ ("if",[A,B,C]), ("then",[D,E,F]), ("else",[G,H,I,J]) ]
-    * 
-    * EXISTS A B : C . D E 
-    * -->
-    * List [ ("EXISTS",[A,B]), (":",[C]), (".",[D,E]) ] *)
-
-   datatype 'tok datum = 
-      Atom of 'tok * Pos.t
-    | List of ('tok * 'tok datum list * Pos.t) list 
-   type 'tok t = 'tok datum
-
-   (* The coordinate is the entire width of the datum, including the token. *)
-   type 'tok piece = 'tok * 'tok datum list * Pos.t
-end
-
 functor ParseDatum (structure Datum: DATUM where type whitespace = unit 
-                                             and type pos = Pos.t) = 
+                                             and type pos = Pos.t
+                    val unshiftable: string list
+                    val global_schema: string Schema.t) = 
 struct
 
-   val unshiftable = ["."]
-   val global_schema = Schema.scheme
    val eq = fn (x, y: string) => x = y
    val toString = fn x: string => x
 
@@ -51,12 +14,6 @@ struct
    fun lookup [] y = NONE
      | lookup ((x, data) :: xs) y = if eq (x, y) then SOME data else lookup xs y
 
-   fun >>(f,g) = fn x => g(f(x))
-   fun |>(x,f) = f x
-
-   infixr 2 >>
-   infix 1 |>
-   
    datatype 'a stack
      = Bot
      | $ of 'a stack * 'a
@@ -196,21 +153,4 @@ struct
                 str')
             end)
 
-(*
-   fun lookup_schemas schemas 
-
-   fun shift S local_schema str = 
-      case Stream.force str of 
-         Stream.Nil => reduce_forever S
-       | Stream.Cons ((c, pos), cs) =>
-           (case local_schema c of 
-               SOME con => continue con (reduce S) (c, pos) cs
-             | NONE => 
-                 (case lookup grammar c of
-                     SOME con => begin con S (c, pos) cs
-                   | NONE =>  
-                       (case member unshiftable c of 
-                           SOME con => reduce_forever S
-                         | NONE
-*)
 end
