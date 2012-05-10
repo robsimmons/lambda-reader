@@ -133,24 +133,6 @@ struct
             parse_exactly_one coord0 pieces (tok, pos) local_unshifts  
                (Stream.front str))
 
-   (* Handles EXACTLY_ONE continuations *)
-   and parse_exactly_one coord0 pieces (tok, pos) local_unshifts str
-   : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
-     (case str of 
-         Stream.Nil => raise EndOfInput (coord0, str, [])
-       | Stream.Cons (front as ((newtok, newpos), newstr)) => 
-            if member unshiftable newtok orelse member local_unshifts newtok
-            then raise EndOfInput (coord0, str, [])
-            else (* Find the datum; return the datum *)
-            let val (datum, pos', str') = 
-                   parse_one front local_unshifts (* PRESERVE LOCAL UPSHIFTS *)
-               val pieces' = pieces $ (tok, [datum], Pos.union pos pos')
-            in 
-               (Datum.List (toList pieces),
-                Pos.pos coord0 (Pos.right pos'),
-                str')
-            end)
-
    (* Handles MUST_SEE continuations. 
     * The local_unshifts are temporarily irrelevant in the handling of 
     * MUST_SEE continuations; they will only become relevant if a later token
@@ -179,7 +161,58 @@ struct
                         local_unshifts
                         str'
                   end)))
-         
+
+   (* Handles MAY_SEE continuations. *)
+   and parse_may coord0 pieces (tok, pos, datums) schema local_unshifts str
+   : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
+     (case str of 
+         Stream.Nil => (* Done! (by default) *)
+            (Datum.List (toList (pieces $ (tok, toList datums, pos))),
+             Pos.pos coord0 (Pos.right pos),
+             str)
+       | Stream.Cons (front as ((newtok, newpos), newstr)) => 
+           (case lookup schema newtok of 
+               SOME token_cont => (* Next piece of multipart will now begin! *)
+                  parse_cont token_cont coord0
+                     (pieces $ (tok, toList datums, pos)) 
+                     (newtok, newpos)
+                     local_unshifts
+                     newstr
+             | NONE => (* Not starting the next piece of the multipart. *)
+                 (if member unshiftable newtok 
+                     orelse member local_unshifts newtok
+                  then (* Also done! (by default, token that we won't shift) *)
+                     (Datum.List (toList (pieces $ (tok, toList datums, pos))),
+                      Pos.pos coord0 (Pos.right pos),
+                      str)
+                  else (* Add another datum to this piece *)
+                  let (* AUGMENT LOCAL UNSHIFTS *)
+                     val local_unshifts = local_unshifts @ (map #1 schema)
+                     val (datum, pos', str') = parse_one front local_unshifts
+                  in parse_may coord0 pieces
+                        (tok, Pos.union pos pos', datums $ datum)
+                        schema 
+                        local_unshifts
+                        str'
+                  end)))         
+
+   (* Handles EXACTLY_ONE continuations *)
+   and parse_exactly_one coord0 pieces (tok, pos) local_unshifts str
+   : string Datum.t * Pos.t * (string * Pos.t) Stream.front  = 
+     (case str of 
+         Stream.Nil => raise EndOfInput (coord0, str, [])
+       | Stream.Cons (front as ((newtok, newpos), newstr)) => 
+            if member unshiftable newtok orelse member local_unshifts newtok
+            then raise EndOfInput (coord0, str, [])
+            else (* Find the datum; return the datum *)
+            let val (datum, pos', str') = 
+                   parse_one front local_unshifts (* PRESERVE LOCAL UPSHIFTS *)
+               val pieces' = pieces $ (tok, [datum], Pos.union pos pos')
+            in 
+               (Datum.List (toList pieces),
+                Pos.pos coord0 (Pos.right pos'),
+                str')
+            end)
 
 (*
    fun lookup_schemas schemas 
