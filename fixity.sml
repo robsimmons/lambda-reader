@@ -28,115 +28,111 @@ struct
 (* fun assert f = () *)
 end
 
-structure Resolve = 
-struct
-   structure Precedence = IntOrdered
+signature FIXITY = 
+sig
+   type precedence
+   type tok
+   type result
+   
+   (* Internal state of the parser (allows for resumption) *)
+   type partial_state (* Needs more input to resolve fixity *)
+   type total_state (* Has enough input to resolve fixity *)
+
+   (* Fixity resolution can't be given an empty list/stream *)
+   exception EmptyFixity 
+   exception TrailingInfix of tok * partial_state  (* "2 + 6 + 9 +" *)
+   exception TrailingPrefix of tok * partial_state (* "2 + ~ 8 + 9 ~" *)
+   exception SuccessiveInfix of tok * tok          (* "2 + + 8" *)
+   exception PrefixInfix of tok * tok              (* "2 ~ + 6" *)
+   exception ConsecutiveNonInfix of tok * tok      (* "2 = 3 = 5" *)
+   exception MixedAssociation of tok * lrn * tok * lrn (* "a <- b -> c" *)
+   exception PrefixPrecInfix of tok * tok          (* "~ 2 + 4", same prec. *) 
+   exception Finished of total_state               (* "2 + 9 * 12" *)
+end
+
+functor SimplestFixityFn 
+  (structure Precedence: ORDERED
    type tok = string
+   type result = string):>
+FIXITY where type precedence = Precedence.t 
+         and type tok = tok
+         and type result = result = 
+struct
+   type precedence = Precedence.t
+   type tok = string
+   type result = string
 
-   exception EmptyFixity
-   exception TrailingInfix of tok
-   exception TrailingPrefix of tok
-   exception SuccessiveInfix of tok * tok
-   exception PrefixInfix of tok * tok
 
-(*
-   datatype 'a fix = 
-      Left of tok * Precedence.t * ('a list * 'a list -> 'a) 
-    | Right of tok * Precedence.t * ('a list * 'a list -> 'a)
-    | None of tok * Precedence.t * ('a list * 'a list -> 'a)
-    | Prefix of tok * Precedence.t * ('a list -> 'a)
-    | Postfix of tok * Precedence.t * ('a list -> 'a)
+   (* Precedence with an extra top and bottom, and comparison *)
 
-   val fake = ""
+   datatype opt_prec = MIN | PREC of Precedence.t | MAX 
 
-   datatype listitem = 
-      DATUM of string Datum.t
-    | OPER of string Datum.t fix option (* NONE is an application *)
+   fun compare x =
+      case x of 
+         (MIN, MIN) => EQUAL
+       | (MIN, _) => LESS
+       | (PREC _, MIN) => GREATER
+       | (PREC prec1, PREC prec2) => Precedence.compare (prec1, prec2)
+       | (MAX, MAX) => EQUAL
+       | (_, MAX) => LESS  
+       | (MAX, _) => GREATER
 
-   fun binary con prec sym = 
-      OPER (SOME (con (sym, prec, fn (xs, ys) => 
-                                     Datum.List [(sym, xs, Datum.poss xs),
-                                                (sym, ys, Datum.poss ys)])))
+   fun eq x = EQUAL = compare x
+   fun lt x = LESS = compare x
+   fun leq x = GREATER <> compare x
 
-   fun binary_swap con prec sym = 
-      OPER (SOME (con (sym, prec, fn (xs, ys) => 
-                                     Datum.List [(sym, ys, Datum.poss ys), 
-                                                 (sym, xs, Datum.poss xs)])))
 
-   fun unary con prec sym = 
-      OPER (SOME (con (sym, prec, fn xs => 
-                                     Datum.List [(sym, xs, Datum.poss xs)])))
-
-   fun fixity datum = 
-      case datum of
-         Datum.Atom ("o-", pos) => binary_swap Left  1 "-o"
-       | Datum.Atom ("@-", pos) => binary_swap Left  1 "-@"
-       | Datum.Atom ("<-", pos) => binary_swap Left  1 "->"
-       | Datum.Atom ("-o", pos) => binary      Right 2 "-o" 
-       | Datum.Atom ("-@", pos) => binary      Right 2 "-@"
-       | Datum.Atom ("->", pos) => binary      Right 2 "->"
-       | Datum.Atom ("*", pos)  => binary      Right 3 "*"
-       | Datum.Atom ("&", pos)  => binary      Right 3 "&"
-       | Datum.Atom ("#1", pos) => unary       Prefix 4 "#1"
-       | Datum.Atom ("#2", pos) => unary       Prefix 4 "#2"
-       | Datum.Atom ("!", pos) =>  unary       Prefix 4 "!"
-       | Datum.Atom ("@", pos) =>  unary       Prefix 4 "@"
-       | _ => DATUM datum
-
-   (* Ensure that an application always falls between two adjacent tokens *)
-   fun juxta y [] = y :: []
-     | juxta (DATUM x) (DATUM y :: ys) = 
-          DATUM x :: OPER NONE :: juxta (DATUM y) ys
-     | juxta x (y :: ys) = x :: juxta y ys
-
-*)
+   (* Generic stacks (snoc lists) and the stack items we'll put on them *)
 
    datatype 'a stack
      = Bot
      | $ of 'a stack * 'a
 
    infix 2 $
+
+   datatype lrn = LEFT | RIGHT | NON
  
-   datatype stackitem = 
-      DAT of unit
-    | PREFIX of Precedence.t * tok * unit
-    | INFIX of Precedence.t * tok * unit
+   datatype item = 
+      DAT of result
+    | PREFIX of Precedence.t * tok * (result -> result)
+    | INFIX of Precedence.t * lrn * tok * (result -> result -> result)
 
-   datatype opt_prec = MIN | PREC of Precedence.t | MAX 
+   
+   (* Exception interface *)
 
-   fun lt (MIN, MIN) = false
-     | lt (MIN, _) = true
-     | lt (PREC _, MIN) = false
-     | lt (PREC prec1, PREC prec2) = 
-          LESS = Precedence.compare (prec1, prec2)
-     | lt (PREC _, MAX) = true
-     | lt (MAX, _) = false
+   type state = item stack * opt_prec
+   type total_state = state
+   type partial_state = state
 
-   fun leq (MIN, _) = true
-     | leq (PREC _, MIN) = false
-     | leq (PREC prec1, PREC prec2) = 
-          GREATER <> Precedence.compare (prec1, prec2) 
-     | leq (PREC _, MAX) = true
-     | leq (MAX, MIN) = false
-     | leq (MAX, PREC _) = false
-     | leq (MAX, MAX) = true
+   exception EmptyFixity
+   exception TrailingInfix of tok * state
+   exception TrailingPrefix of tok * state
+   exception SuccessiveInfix of tok * tok
+   exception PrefixInfix of tok * tok
+   exception ConsecutiveNonInfix of tok * tok
+   exception MixedAssociation of tok * lrn * tok * lrn
+   exception PrefixPrecInfix of tok * tok
+   exception Finished of state
 
    (* valid_stack checks for the well-formedness of a shift-reduce
     * parse stack.
     * 
     * A shift-reduce stack is well-formed if it represents a complete
-    * parse in which the operators are *strictly* ordered from lowest
-    * to highest. This invariant makes it impossible to parse some
-    * technically unambiguous strings, like "- sin - 5", where "-" is
-    * unary minus and "sin" is the sin function. If unary minus has
-    * lower precedence (binds less tightly) than sin, we must write "-
-    * sin (- 5)". Alternatively, if unary minus has higher precedence
-    * (binds more tightly) than sin, we must write "- (sin - 5)".
+    * parse in which the operators are (non-strictly) ordered from
+    * lowest to highest. This invariant makes it impossible to parse
+    * some technically unambiguous strings, like "- sin - 5", where
+    * "-" is unary minus and "sin" is the unary sin function and the
+    * two have different precedence. If unary minus has lower
+    * precedence (binds less tightly) than sin, we must write "- sin
+    * (- 5)". Alternatively, if unary minus has higher precedence
+    * (binds more tightly) than sin, we must write "- (sin - 5)". (If
+    * the two have the same precedence, then "- sin - 5" can parse
+    * correctly.)
     *
-    * Certainly, it would be possible to allow "- sin - 5" to parse 
-    * meaningfully, but resulting invariant would be more complicated,
-    * and just because something is possible that doesn't mean it's
-    * a good idea. *)
+    * Certainly, it would be possible to allow "- sin - 5" to parse
+    * meaningfully, even if the two had different precedences, but the
+    * resulting invariant would be more complicated, and just because
+    * something is possible that doesn't mean it's a good idea. *)
 
    fun valid_stack S =
    let
@@ -152,7 +148,7 @@ struct
           | S $ PREFIX (prec, _, _) (* $ d1 *) =>
                leq (PREC prec, low) 
                andalso validate_at S (PREC prec) 
-          | S $ d1 $ INFIX (prec, _, _) (* $ d2 *) =>
+          | S $ d1 $ INFIX (prec, _, _, _) (* $ d2 *) =>
                is_data d1 
                andalso leq (PREC prec, low) 
                andalso validate_at S (PREC prec)
@@ -163,53 +159,126 @@ struct
        | S $ d => is_data d andalso validate_at S MAX
    end
 
+
+   (* Reduce a series of left-associative operations *)
+   fun reduce_left (x: 'a) (ys: (tok * ('a -> 'a -> 'a) * 'a) list): 'a = 
+      case ys of 
+         [] => x
+       | ((_, f, y) :: ys) => reduce_left (f x y) ys
+
+
+   (* Reduce a series of right-associatve operations *)
+   fun reduce_right (x: 'a) (ys: (tok * ('a -> 'a -> 'a) * 'a) list): 'a =
+      case ys of 
+         [] => x
+       | ((_, f, y) :: ys) => f x (reduce_right y ys)
+
+
+   (* reduce_infix_at_precedence
+    * 
+    * If we want to reduce an infix operator, we collect all the
+    * operators at the top of the stack that have the same precedence
+    * on the stack and reduce them at the same time. The resulting
+    * stack will have a strictly lower maximum precedence.
+    * 
+    * Rough example (/ and * are both left associative with same fixity, 6):
+    *
+    * If we call
+    * reduce_infix_at_precedence 
+    *    (Bot $ 4 $ + $ 6 $ * $ 12 $ / $ 16) 
+    *    LEFT * 6 [ ("/", ..., 9), ("*", ..., 2) ]
+    *     
+    * the result will be 
+    * Bot $ 4 $ + $ ((((6*12)/16)/9)*2) 
+    * *)
+
+   fun reduce_infix_at_precedence S (running_prec, lrn, last_tok) xs = 
+   let
+      fun dispatch LEFT x xs = reduce_left x xs
+        | dispatch RIGHT x xs = reduce_right x xs
+        | dispatch NON x [ (_, f, y) ] = f x y
+        | dispatch NON x [] = raise Fail "Invariant: xs must be nonempty"
+        | dispatch NON x ((tok1, _, _) :: (tok2, _, _) :: _) = 
+             raise ConsecutiveNonInfix (tok1, tok2)
+   in 
+    ( Assert.assert (fn () => valid_stack S)
+    ; case S of 
+         Bot $ DAT d => 
+           ((* Finished: dispatch everything *)
+            Bot $ DAT (dispatch lrn d xs))
+       | S $ PREFIX (prec, tok, f) $ DAT d => 
+           ((* Prefix: better be lower prec *)
+            if lt (PREC prec, running_prec) 
+            then S $ PREFIX (prec, tok, f) $ DAT (dispatch lrn d xs)
+            else raise PrefixAtTheSamePrecedenceAsInfix (tok, last_tok))
+       | S $ INFIX (prec, lrn', tok, f) $ DAT d2 =>
+           ((* Infix: better be lower prec or the same associtivity *)
+            if lt (PREC prec, running_prec) 
+            then S $ INFIX (prec, lrn', tok, f) $ DAT (dispatch lrn d2 xs)
+            else if ( Assert.assert (fn () => eq (PREC prec, running_prec))
+                    ; lrn = lrn')
+            then reduce_infix_at_precedence S (running_prec, lrn, tok) 
+                    ((tok, f, d2) :: xs)
+            else raise DifferentAssociativity (tok, lrn', last_tok, lrn))
+       | _ => raise Fail "Impossible? (Should be precluded by assertion)")
+   end
+
+
    (* If we want to add an operator to a valid stack, we have to make sure
-    * everything further down in the stack has lower precedence, effectively
+    * everything further down in the stack has lower or equal precedence, 
     * reducing the overall precedence of the stack.
     * 
     * requires: valid_stack S
     * returns: (S', max_prec) where S' is another valid stack whose 
-    *   maximum precedence is max_prec <= required. *)
+    *   maximum precedence is max_prec <= required. *)         
 
    fun reduce_precedence S required = 
     ( Assert.assert (fn () => valid_stack S)
     ; case S of 
          Bot $ d => (S, MIN)
-       | S' $ PREFIX (prec, _, f) $ d => 
-           (if leq (PREC prec, required) then (S, PREC prec)
-            else reduce_precedence (S' $ DAT ()) required)
-       | S' $ d1 $ INFIX (prec, _, f) $ d2 => 
-           (if leq (PREC prec, required) then (S, PREC prec)
-            else reduce_precedence (S' $ DAT ()) required)
+       | S' $ PREFIX (prec, _, f) $ DAT d => 
+           (if leq (PREC prec, required) 
+            then (S, PREC prec)
+            else reduce_precedence (S' $ DAT (f d)) required)
+       | S' $ INFIX (prec, lrn, tok, f) $ DAT d2 => 
+           (if leq (PREC prec, required) 
+            then (S, PREC prec)
+            else reduce_precedence
+                    (reduce_infix_at_precedence S' (PREC prec, lrn, tok) 
+                        [(tok, f, d2)])
+                    required)
        | _ => raise Fail "Impossible? (Should be caught by assertion.)")
 
 
+   (* shift is called on an arbitrary valid stack and list of tokens *)
+
+   fun shift (state as (S, _)) xs = 
+   ( Assert.assert (fn () => valid_stack S)
+   ; if null xs 
+     then raise Finished state
+     else must_shift state xs)
+
    (* must_shift is called when either
-    *   1 - the input is *known* to be nonempty, and S is valid
-    *   2 - the input is a valid input + 1 infix + n prefix operators *)
-   fun must_shift S max_stack_prec [] = 
+    *   1 - we are starting with new input
+    *   2 - the input is *known* to be nonempty, and S is valid
+    *   3 - the input is a valid input + 1 infix + n prefix operators *)
+   and must_shift (state as (S, max_stack_prec)) [] = 
          (case S of 
              Bot => raise EmptyFixity
-           | S $ INFIX (_, tok, _) => raise TrailingInfix tok
-           | S $ PREFIX (_, tok, _) => raise TrailingPrefix tok
-           | _ => raise Fail "Impossible by invariant?")
-     | must_shift S max_stack_prec (x :: xs) = raise Match
-         (*case x of 
+           | _ $ INFIX (_, _, tok, _) => raise TrailingInfix (tok, state)
+           | _ $ PREFIX (_, tok, _) => raise TrailingPrefix (tok, state)
+           | _ => raise Fail "Invariant failed")
+     | must_shift (S, max_stack_prec) (x :: xs) = raise Match
+         
+         
+(*         case x of 
              DAT () => shift (S $ DAT ()) max_stack_prec
-           | INFIX (prec, _) => 
+           | INFIX (prec, tok, _) => 
                (case S of 
-                   _ $ INFIX (prec, g) => 
+                   _ $ INFIX (prec, tok, g) => 
          (if is_first 
           the *)
 
-   fun shift S max_stack_prec xs = 
-   ( Assert.assert (fn () => valid_stack S)
-   ; case xs of
-        [] => 
-        (case #1 (reduce_precedence S MIN) of 
-            Bot $ DAT () => ()
-          | _ => raise Fail "Impossible by reduce_precedence's postcondition")
-      | _ => must_shift S max_stack_prec xs)
             
     
 
