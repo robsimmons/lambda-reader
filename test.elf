@@ -4,3 +4,7 @@ nat: type.
 
 x: {_: nat} type.
 y: {_: nat} type = [n] x n.
+
+q: (nat -> nat) -> type.
+% a: q [x] x -> q [x] x. % <- this does not work, as expected.
+a: q ([x] x) -> q ([x] x).
