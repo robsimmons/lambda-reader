@@ -30,9 +30,6 @@ end
 
 structure Resolve = 
 struct
-
-   structure Datum = PosDatum
-
    structure Precedence = IntOrdered
    type tok = string
 
@@ -42,6 +39,7 @@ struct
    exception SuccessiveInfix of tok * tok
    exception PrefixInfix of tok * tok
 
+(*
    datatype 'a fix = 
       Left of tok * Precedence.t * ('a list * 'a list -> 'a) 
     | Right of tok * Precedence.t * ('a list * 'a list -> 'a)
@@ -85,18 +83,20 @@ struct
        | Datum.Atom ("@", pos) =>  unary       Prefix 4 "@"
        | _ => DATUM datum
 
-   datatype 'a stack
-     = Bot
-     | $ of 'a stack * 'a
-
-   infix 2 $
- 
    (* Ensure that an application always falls between two adjacent tokens *)
    fun juxta y [] = y :: []
      | juxta (DATUM x) (DATUM y :: ys) = 
           DATUM x :: OPER NONE :: juxta (DATUM y) ys
      | juxta x (y :: ys) = x :: juxta y ys
 
+*)
+
+   datatype 'a stack
+     = Bot
+     | $ of 'a stack * 'a
+
+   infix 2 $
+ 
    datatype stackitem = 
       DAT of unit
     | PREFIX of Precedence.t * tok * unit
