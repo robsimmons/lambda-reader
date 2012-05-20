@@ -1,4 +1,0 @@
-(x y (foo bar baz) (foo . (bar . baz)) . w).
-(x x x x x . baz).
-(.).
-(x. .).

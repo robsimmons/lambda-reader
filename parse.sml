@@ -3,35 +3,40 @@
 signature PARSE_DATUM =
 sig
    type tok
+   type name (* Ignored, but needs to be given for EndOfInput exception *)
    type 'tok datum
 
    exception ParseZero (* Raised by parse if there's nothing to parse *)
    exception EndOfInput of 
-      Coord.coord * (tok * Pos.t) Stream.front * tok Schema.t
+      Coord.coord * (tok * Pos.t) Stream.front * (tok, name) Schema.t
 
    val parse: 
-      (tok Schema.t * tok list)
+      ((tok, name) Schema.t * tok list)
       -> (tok * Pos.pos) Stream.front 
       -> tok datum * Pos.t * (tok * Pos.pos) Stream.front
 
    val parseMany:
-      (tok Schema.t * tok list)
+      ((tok, name) Schema.t * tok list)
       -> (tok * Pos.pos) Stream.front
       -> tok datum list * (tok * Pos.pos) Stream.front
 
    val parseStream:
-      (tok Schema.t * tok list)
+      ((tok, name) Schema.t * tok list)
       -> (tok * Pos.pos) Stream.front
       -> (tok datum * Pos.pos) Stream.stream
 end
 
 functor ParseDatumFn (structure Datum: DATUM where type whitespace = unit 
                                                and type pos = Pos.t
-                      structure Tok: HASHABLE):> 
-   PARSE_DATUM where type tok = Tok.t and type 'tok datum = 'tok Datum.t = 
+                      structure Tok: HASHABLE
+                      type name):> 
+   PARSE_DATUM where type tok = Tok.t
+                 and type 'tok datum = 'tok Datum.t
+                 and type name = name = 
 struct
 
    type tok = Tok.t
+   type name = name
    type 'tok datum = 'tok Datum.t
    val eq = Tok.eq
 
@@ -57,7 +62,7 @@ struct
    (* End of input reached without finishing multipart syntax begun at coord;
     * provides series of tokens that were expected next. *)
    exception EndOfInput of 
-      Coord.coord * (tok * Pos.t) Stream.front * tok Schema.t
+      Coord.coord * (tok * Pos.t) Stream.front * (tok, name) Schema.t
 
    fun parseMain (global_schema, unshiftable) token_stream = 
    let 
@@ -88,17 +93,17 @@ struct
       and parse_cont cont coord0 pieces (tok, pos) local_unshifts str
       : tok Datum.t * Pos.t * (tok * Pos.t) Stream.front  = 
         (case cont of 
-            Schema.DONE => 
+            Schema.DONE _ => 
                (Datum.list (toList (pieces $ (tok, (), [], pos))), 
                 Pos.pos coord0 (Pos.right pos),
                 Stream.front str)
           | Schema.MUST_SEE schema =>
                parse_must coord0 pieces (tok, Bot, pos) schema local_unshifts 
                   (Stream.front str)
-          | Schema.MAY_SEE schema => 
+          | Schema.MAY_SEE (schema, _) => 
                parse_may coord0 pieces (tok, Bot, pos) schema local_unshifts
                   (Stream.front str)
-          | Schema.EXACTLY_ONE => 
+          | Schema.EXACTLY_ONE _ => 
                parse_exactly_one coord0 pieces (tok, pos) local_unshifts  
                   (Stream.front str))
 

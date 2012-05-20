@@ -24,8 +24,9 @@ sig
 end
 
 
-(* Simple syntactic datums *)
 
+
+(* Simple syntactic datums *)
 structure SimpleDatum = 
 struct
    datatype 'tok datum = 
@@ -34,6 +35,7 @@ struct
    type 'tok t = 'tok datum
 end
 
+(* Adapts SimpleDatum to DATUM with any whitespace/pos type. *)
 functor SimpleDatumFn (type whitespace type pos):> 
    DATUM where type 'tok datum = 'tok SimpleDatum.datum
          and type whitespace = whitespace 
@@ -49,8 +51,9 @@ struct
 end
 
 
-(* Syntactic datums carrying positional information *)
 
+
+(* Syntactic datums carrying positional information *)
 structure PosDatum = 
 struct
    datatype 'tok datum = 
@@ -73,6 +76,7 @@ struct
        in loop pos0 datums end 
 end
 
+(* Adapts PosDatum to DATUM with any whitespace type *)
 functor PosDatumFn (type whitespace):> 
    DATUM where type 'tok datum = 'tok PosDatum.datum
          and type whitespace = whitespace 

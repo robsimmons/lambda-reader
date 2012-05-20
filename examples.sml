@@ -1,6 +1,5 @@
 
-
-structure Examples = 
+structure SimpleExamples = 
 struct
    open SimpleDatum
 
@@ -18,7 +17,8 @@ struct
    structure Parse = 
    ParseDatumFn
      (structure Datum = SimpleDatumFn (type whitespace = unit type pos = Pos.t)
-      structure Tok = StringHashable)
+      structure Tok = StringHashable
+      type name = unit)
 
    fun run schema (string, datum: string datum) =
    let
@@ -31,41 +31,46 @@ struct
    fun check schema (string, datum: string datum) = 
    let
       val (datum', stream') = run schema (string, datum)
-      
    in 
-      if datum <> datum' 
-      then raise Fail "Datums that were supposed to match failed to match"
-      else case stream' of 
-              Stream.Nil => () 
-            | Stream.Cons _ => raise Fail "Incomplete lex" 
+      Testing.expect ()
+         (fn () => datum = datum' 
+                   andalso (case stream' of Stream.Nil => true | _ => false))
+         string
    end
 
-   val a = check Schema.scheme
+   val () = Testing.reset ()
+
+   val () = check Schema.scheme
            ("'A", 
             List [ ("'", [A]) ])
 
-   val b = check Schema.scheme
+   val () = check Schema.scheme
            ("[A B C D]",
             List [ ("[",[A,B,C,D]), ("]",[]) ])
 
-   val c = check Schema.scheme
+   val () = check Schema.scheme
            ("(A B . C D)",
             List [ ("(",[A,B]), (".",[C,D]), (")",[]) ])
 
-   val d = check Schema.mllang
+   val () = check Schema.mllang
            ("if A B then C D else E F G H I J",
             List [ ("if",[A,B]),
                    ("then",[C,D]),
                    ("else",[E,F,G,H,I,J]) ])
 
-   val e = check Schema.mllang
+   val () = check Schema.mllang
            ("if A B C then D E F else if G H then I J", 
             List [ ("if",[A,B,C]), 
                    ("then",[D,E,F]), 
                    ("else",[List [ ("if",[G,H]), ("then",[I,J]) ]]) ])
 
-   val f = check Schema.celf
+   val () = check Schema.celf
            ("EXISTS A B : C . D E",
             List [ ("EXISTS",[A,B]), (":",[C]), (".",[D,E]) ])
+
+   val () = print "\nSimpleExamples:\n"
+   val () = Testing.report ()
 end
+
+
 

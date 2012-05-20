@@ -1,6 +1,6 @@
 Group is 
 
-../cmlib/cmlib.cm
+$SMACKAGE/cmlib/v1/cmlib.cm
 
 (* Representations of syntax *)
 datum.sml
@@ -13,6 +13,8 @@ lex-twelf.sml
 (* Generic parser *)
 schema.sml
 parse.sml
+
+$SMACKAGE/cmlib/v1/tests/testing.cm
 
 examples.sml
 
