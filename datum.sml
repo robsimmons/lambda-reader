@@ -50,9 +50,6 @@ struct
       SimpleDatum.List (map (fn (tok, _, datums, _) => (tok, datums)) pieces)
 end
 
-
-
-
 (* Syntactic datums carrying positional information *)
 structure PosDatum = 
 struct
