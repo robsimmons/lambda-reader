@@ -100,8 +100,9 @@ struct
           | Schema.MUST_SEE schema =>
                parse_must coord0 pieces (tok, Bot, pos) schema local_unshifts 
                   (Stream.front str)
-          | Schema.MAY_SEE (schema, _) => 
-               parse_may coord0 pieces (tok, Bot, pos) schema local_unshifts
+          | Schema.MAY_SEE (schema, extra_unshifts, _) => 
+               parse_may coord0 pieces (tok, Bot, pos) schema 
+                  (extra_unshifts @ local_unshifts)
                   (Stream.front str)
           | Schema.EXACTLY_ONE _ => 
                parse_exactly_one coord0 pieces (tok, pos) local_unshifts  
@@ -204,12 +205,18 @@ struct
          NONE => raise ParseZero
        | SOME front => front
 
-   fun parseMany data str = 
+   fun parseMany (data as (_, unshiftable)) str = 
    let
+      fun immediately_unshiftable str = 
+         case str of 
+            Stream.Nil => true
+          | (Stream.Cons ((s, _), _)) => member unshiftable s
+
       fun loop stack str = 
-         case parseMain data str of
-            NONE => (toList stack, str)
-          | SOME (datum, _, str) => loop (stack $ datum) str
+         if immediately_unshiftable str then (toList stack, str)
+         else case parseMain data str of
+                 NONE => (toList stack, str)
+               | SOME (datum, _, str) => loop (stack $ datum) str
    in
       loop Bot str
    end

@@ -17,8 +17,10 @@ sig
       (* The datum continues until either one of these characters is reached,
        * or an unshiftable character/end of input is reached. If this list 
        * is empty, this is the usual "longest parse" semantics of binding
-       * syntax. *)
-    | MAY_SEE of ('tok * ('tok, 'name) token_cont) list * 'name
+       * syntax. The second list represents any augmentations that should
+       * be made to the list of unshiftable tokens for the purpose of
+       * this MAY binding. *)
+    | MAY_SEE of ('tok * ('tok, 'name) token_cont) list * 'tok list * 'name
 
       (* Parse exactly one more character and add it to the datum. This is 
        * a very demanding prefix operator. If there is nothing to parse next
@@ -43,14 +45,14 @@ struct
    datatype ('tok, 'name) token_cont = 
       DONE of 'name
     | MUST_SEE of ('tok * ('tok, 'name) token_cont) list
-    | MAY_SEE of ('tok * ('tok, 'name) token_cont) list * 'name
+    | MAY_SEE of ('tok * ('tok, 'name) token_cont) list * 'tok list * 'name
     | EXACTLY_ONE of 'name
 
    type ('tok, 'name) t = ('tok * ('tok, 'name) token_cont) list
    type ('tok, 'name) schema = ('tok * ('tok, 'name) token_cont) list
 
    fun series_longest [] = raise Fail "Invariant (series_longest)"
-     | series_longest [x] = (x, MAY_SEE ([], ()))
+     | series_longest [x] = (x, MAY_SEE ([], [], ()))
      | series_longest (x :: xs) = (x, MUST_SEE [ series_longest xs ]) 
 
    fun series [] = raise Fail "Invariant (series)"
@@ -72,14 +74,14 @@ struct
         series_longest [ "fn" ],
         ("if", MUST_SEE 
                 [ ("then", MAY_SEE 
-                            ([ ("else", MAY_SEE ([], ())) ], ())) ]) ]
+                            ([ ("else", MAY_SEE ([], [], ())) ], [], ())) ]) ]
 
 
    (* Celf *)
    val optional_annotation_binding = 
       MUST_SEE 
-       [ (".", MAY_SEE ([], ())),
-         (":", MUST_SEE [ (".", MAY_SEE ([], ())) ]) ]
+       [ (".", MAY_SEE ([], [], ())),
+         (":", MUST_SEE [ (".", MAY_SEE ([], [], ())) ]) ]
 
    val celf = 
       [ series ["(", ")"],
@@ -100,7 +102,7 @@ struct
    val optional_intermediate_colon = 
       fn close => MUST_SEE 
                    [ (close, DONE ()),
-                     (":", MUST_SEE [ (close, MAY_SEE ([], ())) ]) ]
+                     (":", MUST_SEE [ (close, MAY_SEE ([], [], ())) ]) ]
 
    val twelf = 
       [ series [ "->" ],
@@ -119,7 +121,7 @@ struct
    val optional_intermediate_dot = 
       fn close => MUST_SEE 
                    [ (close, DONE ()), 
-                     (".", MUST_SEE [ (close, MAY_SEE ([], ())) ]) ]
+                     (".", MUST_SEE [ (close, MAY_SEE ([], [], ())) ]) ]
 
    val scheme = 
       [ (* Actually a comment. *)

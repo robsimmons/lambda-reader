@@ -71,6 +71,14 @@ struct
           fun loop pos' [] = Pos.union pos0 pos' 
             | loop _ (datum :: datums) = loop (pos datum) datums
        in loop pos0 datums end 
+
+   local 
+   fun print' datum = 
+      case datum of 
+         Atom (s, _) => print (s^" ")
+       | List ls =>
+            app (fn (s, ds, _) => (print (s^" "); app print' ds)) ls
+   in val print = print' end
 end
 
 (* Adapts PosDatum to DATUM with any whitespace type *)

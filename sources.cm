@@ -17,5 +17,3 @@ parse.sml
 $SMACKAGE/cmlib/v1/tests/testing.cm
 
 examples.sml
-
-fixity.sml
